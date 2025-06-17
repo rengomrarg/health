@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dieta Interactiva</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    table, th, td {
+      border: 1px solid black;
+      border-collapse: collapse;
+      padding: 5px;
+    }
+    input[type=number] {
+      width: 80px;
+    }
+    table {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Planificador de Dieta</h2>
+
+<!-- Dropdown -->
+<label for="foodDropdown">Selecciona un alimento:</label>
+<select id="foodDropdown"></select>
+<button onclick="addFood()">Agregar</button>
+
+<!-- Calorías objetivo -->
+<br><br>
+<label for="caloriasObjetivo">Calorías objetivo:</label>
+<input type="number" id="caloriasObjetivo" placeholder="Solo números" />
+
+<!-- Tabla de alimentos seleccionados -->
+<h3>Alimentos seleccionados</h3>
+<table id="foodTable">
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>Porción</th>
+      <th>Calorías</th>
+      <th>Cantidad</th>
+      <th>Eliminar</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<!-- Gráfico de pastel -->
+<h3>Gráfico Nutricional</h3>
+<canvas id="pieChart" width="300" height="300"></canvas>
+
+<!-- Botones -->
+<br>
+<button onclick="resetAll()">Reset</button>
+<button onclick="sendData()">Enviar</button>
+
+<!-- Tabla de respuesta -->
+<h3>Resultado del servidor</h3>
+<table id="responseTable">
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>Porción</th>
+      <th>Calorías</th>
+      <th>Cantidad</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+  let foodData = [];
+
+  // Cargar alimentos del servidor al iniciar
+  window.onload = async () => {
+    try {
+      const response = await fetch("http://nodered.fidach.top/webhook-dieta");
+      foodData = await response.json();
+      const dropdown = document.getElementById("foodDropdown");
+      foodData.forEach(item => {
+        const option = document.createElement("option");
+        option.value = JSON.stringify(item);
+        option.textContent = item.item;
+        dropdown.appendChild(option);
+      });
+    } catch (error) {
+      console.error("Error al cargar alimentos:", error);
+    }
+  };
+
+  // Agregar alimento a la tabla
+  function addFood() {
+    const dropdown = document.getElementById("foodDropdown");
+    const selectedItem = JSON.parse(dropdown.value);
+
+    const table = document.getElementById("foodTable").querySelector('tbody');
+
+    // Verificar si ya fue agregado
+    for (let row of table.rows) {
+      if (row.cells[0].textContent === selectedItem.item) {
+        alert("Este alimento ya está en la lista.");
+        return;
+      }
+    }
+
+    const row = table.insertRow();
+    row.insertCell(0).textContent = selectedItem.item;
+    row.insertCell(1).textContent = selectedItem.porcion;
+    row.insertCell(2).textContent = selectedItem.calorias;
+
+    const cantidadCell = row.insertCell(3);
+    const inputCantidad = document.createElement("input");
+    inputCantidad.type = "number";
+    inputCantidad.value = selectedItem.porcion;
+    cantidadCell.appendChild(inputCantidad);
+
+    const deleteCell = row.insertCell(4);
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "X";
+    deleteBtn.onclick = () => row.remove();
+    deleteCell.appendChild(deleteBtn);
+
+    updateChart();
+  }
+
+  // Reiniciar todo
+  function resetAll() {
+    document.getElementById("foodTable").querySelector('tbody').innerHTML = '';
+    document.getElementById("responseTable").querySelector('tbody').innerHTML = '';
+    document.getElementById("caloriasObjetivo").value = '';
+    chart.data.datasets[0].data = [0, 0, 0];
+    chart.update();
+  }
+
+  // Enviar datos al backend y mostrar respuesta
+  function sendData() {
+    const tableRows = document.getElementById("foodTable").querySelector('tbody').rows;
+    const selectedItems = [];
+
+    for (let row of tableRows) {
+      selectedItems.push({
+        item: row.cells[0].textContent,
+        porcion: Number(row.cells[1].textContent),
+        calorias: Number(row.cells[2].textContent),
+        cantidad: Number(row.cells[3].querySelector('input').value)
+      });
+    }
+
+    const caloriasObjetivo = document.getElementById("caloriasObjetivo").value;
+
+    fetch("http://192.168.100.25:1880/webhook-dieta1", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' },
+      //mode: "cors",
+      body: JSON.stringify({
+        caloriasObjetivo,
+        alimentos: selectedItems
+      })
+    })
+    .then(res => res.json())
+    .then(data => mostrarRespuesta(data))
+    .catch(err => alert("Error al enviar datos: " + err));
+  }
+
+  // Mostrar datos recibidos del servidor
+  function mostrarRespuesta(data) {
+    const table = document.getElementById("responseTable").querySelector('tbody');
+    table.innerHTML = '';
+    data.forEach(item => {
+      const row = table.insertRow();
+      row.insertCell(0).textContent = item.item;
+      row.insertCell(1).textContent = item.porcion;
+      row.insertCell(2).textContent = item.calorias;
+      row.insertCell(3).textContent = Number(item.cantidad).toFixed(2);
+    });
+  }
+
+  // Gráfico de pastel
+  const ctx = document.getElementById('pieChart').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: ['Proteínas', 'Carbohidratos', 'Grasas'],
+      datasets: [{
+        data: [33, 33, 34], // Placeholder
+        backgroundColor: ['#4caf50', '#2196f3', '#f44336']
+      }]
+    },
+    options: {
+      responsive: false
+    }
+  });
+
+  function updateChart() {
+    // Simulación (por ahora aleatorio)
+    chart.data.datasets[0].data = [
+      Math.floor(Math.random() * 40 + 20),
+      Math.floor(Math.random() * 40 + 20),
+      Math.floor(Math.random() * 40 + 20)
+    ];
+    chart.update();
+  }
+</script>
+
+</body>
+</html>
