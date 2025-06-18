@@ -76,7 +76,7 @@
   // Cargar alimentos del servidor al iniciar
   window.onload = async () => {
     try {
-      const response = await fetch("http://nodered.fidach.top/webhook-dieta");
+      const response = await fetch("https://nodered.fidach.top/webhook-dieta");
       foodData = await response.json();
       const dropdown = document.getElementById("foodDropdown");
       foodData.forEach(item => {
@@ -150,7 +150,7 @@
 
     const caloriasObjetivo = document.getElementById("caloriasObjetivo").value;
 
-    fetch("http://nodered.fidach.top/webhook-dieta1", {
+    fetch("https://nodered.fidach.top/webhook-dieta1", {
       method: "POST",
       headers: { 'Content-Type': 'application/json' },
       //mode: "cors",
